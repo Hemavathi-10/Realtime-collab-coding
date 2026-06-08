@@ -1,0 +1,163 @@
+const express = require("express");
+const cors = require("cors");
+const dotenv = require("dotenv");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
+
+
+
+
+const connectDB = require("./config/db");
+
+const authRoutes = require("./routes/authRoutes");
+const roomRoutes = require("./routes/roomRoutes");
+const fileRoutes = require("./routes/fileRoutes");
+const codeRoutes = require("./routes/codeRoutes");
+
+dotenv.config();
+connectDB();
+
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+app.use(
+  "/uploads",
+  express.static(
+    path.join(__dirname, "uploads")
+  )
+);
+
+app.use("/api/auth", authRoutes);
+app.use("/api/rooms", roomRoutes);
+app.use("/api/files", fileRoutes);
+app.use("/api/code", codeRoutes);
+
+// Create HTTP server
+const server = http.createServer(app);
+
+// Attach Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+const roomUsers = {};
+// Socket logic
+io.on("connection", (socket) => {
+  console.log("User connected:", socket.id);
+
+socket.on(
+  "send-reaction",
+  (data) => {
+
+    io.to(data.roomId).emit(
+      "receive-reaction",
+      {
+        emoji: data.emoji,
+        username: data.username
+      }
+    );
+
+  }
+);
+
+socket.on("join-room", ({ roomId, username }) => {
+
+  socket.join(roomId);
+
+  if (!roomUsers[roomId]) {
+    roomUsers[roomId] = [];
+  }
+
+  // Remove old entry of same socket if exists
+  roomUsers[roomId] = roomUsers[roomId].filter(
+    user => user.id !== socket.id
+  );
+
+  roomUsers[roomId].push({
+    id: socket.id,
+    username
+  });
+
+  io.to(roomId).emit(
+    "participants-update",
+    roomUsers[roomId]
+  );
+
+});
+
+  // Chat message
+  socket.on(
+  "send-message",
+  ({ roomId, message, username }) => {
+
+    io.to(roomId).emit(
+      "receive-message",
+      {
+        username,
+        message
+      }
+    );
+
+  }
+);
+  socket.on("code-change", ({ roomId, code }) => {
+  socket.to(roomId).emit("code-update", code);
+});
+
+socket.on("whiteboard-update", ({ roomId, lines }) => {
+  socket.to(roomId).emit("whiteboard-sync", lines);
+});
+
+// WebRTC Offer
+socket.on("video-offer", ({ roomId, offer }) => {
+  socket.to(roomId).emit("video-offer", offer);
+});
+
+// WebRTC Answer
+socket.on("video-answer", ({ roomId, answer }) => {
+  socket.to(roomId).emit("video-answer", answer);
+});
+
+// ICE Candidate
+socket.on("ice-candidate", ({ roomId, candidate }) => {
+  socket.to(roomId).emit(
+    "ice-candidate",
+    candidate
+  );
+});
+
+socket.on("user-ready", (roomId) => {
+  socket.to(roomId).emit("user-ready");
+});
+
+socket.on("disconnect", () => {
+
+  for (const roomId in roomUsers) {
+
+    roomUsers[roomId] =
+      roomUsers[roomId].filter(
+        user => user.id !== socket.id
+      );
+
+    io.to(roomId).emit(
+      "participants-update",
+      roomUsers[roomId]
+    );
+  }
+
+});
+
+  
+});
+
+const PORT = process.env.PORT || 5000;
+
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
