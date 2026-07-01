@@ -5,9 +5,6 @@ const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
 
-
-
-
 const connectDB = require("./config/db");
 
 const authRoutes = require("./routes/authRoutes");
@@ -46,114 +43,93 @@ const io = new Server(server, {
   }
 });
 
-const roomUsers = {};
+const roomUsers = {}; // roomId -> [{ id, username }]
+
 // Socket logic
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
 
-socket.on(
-  "send-reaction",
-  (data) => {
-
-    io.to(data.roomId).emit(
-      "receive-reaction",
-      {
-        emoji: data.emoji,
-        username: data.username
-      }
-    );
-
-  }
-);
-
-socket.on("join-room", ({ roomId, username }) => {
-
-  socket.join(roomId);
-
-  if (!roomUsers[roomId]) {
-    roomUsers[roomId] = [];
-  }
-
-  // Remove old entry of same socket if exists
-  roomUsers[roomId] = roomUsers[roomId].filter(
-    user => user.id !== socket.id
-  );
-
-  roomUsers[roomId].push({
-    id: socket.id,
-    username
+  socket.on("send-reaction", (data) => {
+    io.to(data.roomId).emit("receive-reaction", {
+      emoji: data.emoji,
+      username: data.username
+    });
   });
 
-  io.to(roomId).emit(
-    "participants-update",
-    roomUsers[roomId]
-  );
+  socket.on("join-room", ({ roomId, username }) => {
+    socket.join(roomId);
+    socket.roomId = roomId;
 
-});
+    if (!roomUsers[roomId]) {
+      roomUsers[roomId] = [];
+    }
+
+    // Remove old entry of same socket if exists
+    roomUsers[roomId] = roomUsers[roomId].filter(
+      (user) => user.id !== socket.id
+    );
+
+    roomUsers[roomId].push({
+      id: socket.id,
+      username
+    });
+
+    io.to(roomId).emit("participants-update", roomUsers[roomId]);
+  });
 
   // Chat message
-  socket.on(
-  "send-message",
-  ({ roomId, message, username }) => {
+  socket.on("send-message", ({ roomId, message, username }) => {
+    io.to(roomId).emit("receive-message", {
+      username,
+      message
+    });
+  });
 
-    io.to(roomId).emit(
-      "receive-message",
-      {
-        username,
-        message
-      }
-    );
-
-  }
-);
   socket.on("code-change", ({ roomId, code }) => {
-  socket.to(roomId).emit("code-update", code);
-});
+    socket.to(roomId).emit("code-update", code);
+  });
 
-socket.on("whiteboard-update", ({ roomId, lines }) => {
-  socket.to(roomId).emit("whiteboard-sync", lines);
-});
+  socket.on("whiteboard-update", ({ roomId, lines }) => {
+    socket.to(roomId).emit("whiteboard-sync", lines);
+  });
 
-// WebRTC Offer
-socket.on("video-offer", ({ roomId, offer }) => {
-  socket.to(roomId).emit("video-offer", offer);
-});
+  // --- WebRTC signaling (broadcast style, matches 1:1 call) ---
+  socket.on("user-ready", (roomId) => {
+    socket.to(roomId).emit("user-ready");
+  });
 
-// WebRTC Answer
-socket.on("video-answer", ({ roomId, answer }) => {
-  socket.to(roomId).emit("video-answer", answer);
-});
+  socket.on("video-offer", ({ roomId, offer }) => {
+    socket.to(roomId).emit("video-offer", offer);
+  });
 
-// ICE Candidate
-socket.on("ice-candidate", ({ roomId, candidate }) => {
-  socket.to(roomId).emit(
-    "ice-candidate",
-    candidate
-  );
-});
+  socket.on("video-answer", ({ roomId, answer }) => {
+    socket.to(roomId).emit("video-answer", answer);
+  });
 
-socket.on("user-ready", (roomId) => {
-  socket.to(roomId).emit("user-ready");
-});
+  socket.on("ice-candidate", ({ roomId, candidate }) => {
+    socket.to(roomId).emit("ice-candidate", candidate);
+  });
 
-socket.on("disconnect", () => {
+  // --- Screen share lock/broadcast ---
+  // broadcast to everyone else in the room so the share appears
+  // automatically and others get locked out of sharing
+  socket.on("screen-share-started", ({ roomId, userId }) => {
+    socket.to(roomId).emit("screen-share-started", { userId });
+  });
 
-  for (const roomId in roomUsers) {
+  socket.on("screen-share-stopped", ({ roomId, userId }) => {
+    socket.to(roomId).emit("screen-share-stopped", { userId });
+  });
 
-    roomUsers[roomId] =
-      roomUsers[roomId].filter(
-        user => user.id !== socket.id
+  socket.on("disconnect", () => {
+    for (const roomId in roomUsers) {
+      roomUsers[roomId] = roomUsers[roomId].filter(
+        (user) => user.id !== socket.id
       );
 
-    io.to(roomId).emit(
-      "participants-update",
-      roomUsers[roomId]
-    );
-  }
-
-});
-
-  
+      io.to(roomId).emit("participants-update", roomUsers[roomId]);
+    }
+  });
 });
 
 const PORT = process.env.PORT || 5000;

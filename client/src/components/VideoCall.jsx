@@ -1,234 +1,80 @@
 import { useEffect, useRef } from "react";
-import socket from "../socket/socket";
+import { useCall } from "../context/CallContext";
 
-const VideoCall = ({ roomId, onEndCall }) => {
-  const myVideo = useRef(null);
-  const remoteVideo = useRef(null);
+const VideoCall = ({ onEndCall }) => {
+  const myVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
-  const peerConnection = useRef(null);
-  const localStream = useRef(null);
+  const {
+    localStream,
+    localStreamState,
+    remoteStream,
+    callStarted,
+    startCall,
+    endCall,
+    isScreenSharing,
+    screenStream,
+    startScreenShare,
+    stopScreenShare,
+    currentSharerId,
+    mySocketId
+  } = useCall();
 
+  const isLockedByOther = !!currentSharerId && currentSharerId !== mySocketId;
+
+  // Start the call when this panel opens.
   useEffect(() => {
-    const startVideo = async () => {
-      try {
-        const stream =
-          await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: true
-          });
-
-        localStream.current = stream;
-
-        if (myVideo.current) {
-          myVideo.current.srcObject = stream;
-        }
-
-        peerConnection.current =
-          new RTCPeerConnection({
-            iceServers: [
-              {
-                urls:
-                  "stun:stun.l.google.com:19302"
-              }
-            ]
-          });
-
-        stream.getTracks().forEach((track) => {
-          peerConnection.current.addTrack(
-            track,
-            stream
-          );
-        });
-
-        peerConnection.current.ontrack = (
-          event
-        ) => {
-          if (remoteVideo.current) {
-            remoteVideo.current.srcObject =
-              event.streams[0];
-          }
-        };
-
-        peerConnection.current.onicecandidate = (
-          event
-        ) => {
-          if (event.candidate) {
-            socket.emit("ice-candidate", {
-              roomId,
-              candidate: event.candidate
-            });
-          }
-        };
-
-        socket.emit("user-ready", roomId);
-
-      } catch (error) {
-        console.log(error);
-      }
-    };
-
-    startVideo();
-
-    return () => {
-      if (peerConnection.current) {
-        peerConnection.current.close();
-      }
-      if (localStream.current) {
-        localStream.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, [roomId]);
-
-  // Create Offer
-  useEffect(() => {
-    socket.on(
-      "user-ready",
-      async () => {
-        try {
-          const offer =
-            await peerConnection.current.createOffer();
-
-          await peerConnection.current.setLocalDescription(
-            offer
-          );
-
-          socket.emit("video-offer", {
-            roomId,
-            offer
-          });
-        } catch (error) {
-          console.log(error);
-        }
-      }
-    );
-
-    return () => {
-      socket.off("user-ready");
-    };
-  }, [roomId]);
-
-  // Receive Offer
-  useEffect(() => {
-    socket.on(
-      "video-offer",
-      async (offer) => {
-        try {
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(
-              offer
-            )
-          );
-
-          const answer =
-            await peerConnection.current.createAnswer();
-
-          await peerConnection.current.setLocalDescription(
-            answer
-          );
-
-          socket.emit("video-answer", {
-            roomId,
-            answer
-          });
-        } catch (error) {
-          console.log(error);
-        }
-      }
-    );
-
-    return () => {
-      socket.off("video-offer");
-    };
-  }, [roomId]);
-
-  // Receive Answer
-  useEffect(() => {
-    socket.on(
-      "video-answer",
-      async (answer) => {
-        try {
-          await peerConnection.current.setRemoteDescription(
-            new RTCSessionDescription(
-              answer
-            )
-          );
-        } catch (error) {
-          console.log(error);
-        }
-      }
-    );
-
-    return () => {
-      socket.off("video-answer");
-    };
+    if (!callStarted) startCall();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ICE Candidates
+  // ONE effect syncs BOTH video elements every time any relevant state changes.
+  // Keeping them together means a screen-share start (which changes isScreenSharing
+  // and screenStream) re-syncs the remote video at the same time as the local one,
+  // so neither box ever gets left behind in a stale/null state.
   useEffect(() => {
-    socket.on(
-      "ice-candidate",
-      async (candidate) => {
-        try {
-          if (
-            peerConnection.current &&
-            candidate
-          ) {
-            await peerConnection.current.addIceCandidate(
-              new RTCIceCandidate(
-                candidate
-              )
-            );
-          }
-        } catch (error) {
-          console.log(error);
-        }
+    // ── My Camera / My Screen ──────────────────────────────────────────────
+    const myNode = myVideoRef.current;
+    if (myNode) {
+      const src = isScreenSharing && screenStream
+        ? screenStream
+        : localStream.current ?? null;
+
+      if (myNode.srcObject !== src) {
+        myNode.srcObject = src;
       }
-    );
+      if (src) myNode.play().catch(() => {});
+    }
 
-    return () => {
-      socket.off("ice-candidate");
-    };
-  }, []);
-const endCall = () => {
-if (localStream.current) {
+    // ── Remote User ────────────────────────────────────────────────────────
+    const remoteNode = remoteVideoRef.current;
+    if (remoteNode) {
+      if (remoteNode.srcObject !== remoteStream) {
+        remoteNode.srcObject = remoteStream ?? null;
+      }
+      if (remoteStream) remoteNode.play().catch(() => {});
+    }
+  }, [
+    localStreamState,   // fires when camera stream first becomes available
+    isScreenSharing,    // fires when screen share starts / stops
+    screenStream,       // fires when screen stream object changes
+    remoteStream,       // fires when remote peer's stream arrives / changes
+    localStream         // ref object (stable), included for completeness
+  ]);
 
-  localStream.current.getTracks().forEach((track) => {
+  const handleEndCall = () => {
+    if (isScreenSharing) stopScreenShare();
+    endCall();
+    if (onEndCall) onEndCall();
+  };
 
-    track.stop();
-
-    console.log(
-      track.kind,
-      track.readyState
-    );
-
-  });
-
-  localStream.current = null;
-}
-
-  if (myVideo.current) {
-    myVideo.current.srcObject = null;
-  }
-
-  if (remoteVideo.current) {
-    remoteVideo.current.srcObject = null;
-  }
-
-  if (peerConnection.current) {
-    peerConnection.current.close();
-    peerConnection.current = null;
-  }
-
-  socket.off("user-ready");
-  socket.off("video-offer");
-  socket.off("video-answer");
-  socket.off("ice-candidate");
-
-  if (onEndCall) {
-    onEndCall();
-  }
-
-};
+  const handleShareToggle = async () => {
+    if (isScreenSharing) {
+      stopScreenShare();
+    } else {
+      await startScreenShare();
+    }
+  };
 
   return (
     <div
@@ -239,35 +85,62 @@ if (localStream.current) {
         marginBottom: "20px"
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
-        <h3 style={{ margin: 0 }}>Video Call</h3>
-        <button
-          onClick={endCall}
-          style={{
-            background: "#ef4444",
-            color: "white",
-            border: "none",
-            borderRadius: "10px",
-            padding: "10px 16px",
-            cursor: "pointer"
-          }}
-        >
-          End Call
-        </button>
-      </div>
-
       <div
         style={{
           display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
           gap: "10px",
-          alignItems: "flex-start"
+          marginBottom: "12px"
         }}
       >
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <h4>My Camera</h4>
+        <h3 style={{ margin: 0 }}>Video Call</h3>
 
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button
+            onClick={handleShareToggle}
+            disabled={isLockedByOther}
+            title={isLockedByOther ? "Someone else is already sharing" : ""}
+            style={{
+              background: isLockedByOther
+                ? "#9ca3af"
+                : isScreenSharing
+                ? "#f59e0b"
+                : "#2563eb",
+              color: "white",
+              border: "none",
+              borderRadius: "10px",
+              padding: "10px 16px",
+              cursor: isLockedByOther ? "not-allowed" : "pointer"
+            }}
+          >
+            {isScreenSharing ? "Stop Sharing" : "Share Screen"}
+          </button>
+
+          <button
+            onClick={handleEndCall}
+            style={{
+              background: "#ef4444",
+              color: "white",
+              border: "none",
+              borderRadius: "10px",
+              padding: "10px 16px",
+              cursor: "pointer"
+            }}
+          >
+            End Call
+          </button>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
+        {/* My Camera / My Screen */}
+        <div style={{ flex: 1, minWidth: 160 }}>
+          <h4 style={{ margin: "0 0 6px 0" }}>
+            {isScreenSharing ? "My Screen" : "My Camera"}
+          </h4>
           <video
-            ref={myVideo}
+            ref={myVideoRef}
             autoPlay
             muted
             playsInline
@@ -276,16 +149,17 @@ if (localStream.current) {
               border: "1px solid black",
               borderRadius: "10px",
               height: "180px",
-              objectFit: "cover"
+              objectFit: isScreenSharing ? "contain" : "cover",
+              background: "black"
             }}
           />
         </div>
 
+        {/* Remote User */}
         <div style={{ flex: 1.4, minWidth: 180 }}>
-          <h4>Remote User</h4>
-
+          <h4 style={{ margin: "0 0 6px 0" }}>Remote User</h4>
           <video
-            ref={remoteVideo}
+            ref={remoteVideoRef}
             autoPlay
             playsInline
             style={{
