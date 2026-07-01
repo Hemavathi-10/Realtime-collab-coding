@@ -10,7 +10,7 @@ const CreateRoom = () => {
       const token = localStorage.getItem("token");
 
       const res = await axios.post(
-        "http://localhost:5000/api/rooms/create",
+        "https://collabaratory-platform.onrender.com/api/rooms/create",
         {},
         {
           headers: {

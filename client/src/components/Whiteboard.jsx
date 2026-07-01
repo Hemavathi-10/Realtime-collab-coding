@@ -23,7 +23,7 @@ const Whiteboard = ({ roomId }) => {
     const loadWhiteboard = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.get(`http://localhost:5000/api/rooms/data/${roomId}`, {
+        const res = await axios.get(`https://collabaratory-platform.onrender.com/api/rooms/data/${roomId}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.data.whiteboard) setElements(res.data.whiteboard);
@@ -38,7 +38,7 @@ const Whiteboard = ({ roomId }) => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5000/api/rooms/save-whiteboard",
+        "https://collabaratory-platform.onrender.com/api/rooms/save-whiteboard",
         { roomId, lines: updatedElements },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -129,7 +129,7 @@ const Whiteboard = ({ roomId }) => {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5000/api/rooms/save-whiteboard",
+        "https://collabaratory-platform.onrender.com/api/rooms/save-whiteboard",
         { roomId, lines: [] },
         { headers: { Authorization: `Bearer ${token}` } }
       );
