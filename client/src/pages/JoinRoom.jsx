@@ -18,7 +18,7 @@ const JoinRoom = () => {
       const token = localStorage.getItem("token");
 
       await axios.get(
-        `https://collabaratory-platform.onrender.com/api/rooms/${roomId}`,
+        `https://realtime-collab-coding.onrender.com//api/rooms/${roomId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`

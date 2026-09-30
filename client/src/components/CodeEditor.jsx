@@ -27,7 +27,7 @@ const CodeEditor = ({ roomId }) => {
         const token = localStorage.getItem("token");
 
         const res = await axios.get(
-          `https://collabaratory-platform.onrender.com/api/rooms/data/${roomId}`,
+          `https://realtime-collab-coding.onrender.com//api/rooms/data/${roomId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`
@@ -58,7 +58,7 @@ const CodeEditor = ({ roomId }) => {
       const token = localStorage.getItem("token");
 
       await axios.post(
-        "https://collabaratory-platform.onrender.com/api/rooms/save-code",
+        "https://realtime-collab-coding.onrender.com//api/rooms/save-code",
         {
           roomId,
           code: value
@@ -78,7 +78,7 @@ const runCode = async () => {
   try {
 
     const res = await axios.post(
-      "https://collabaratory-platform.onrender.com/api/code/run",
+      "https://realtime-collab-coding.onrender.com//api/code/run",
       {
         code
       }

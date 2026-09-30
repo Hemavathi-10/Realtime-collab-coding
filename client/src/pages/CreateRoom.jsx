@@ -10,7 +10,7 @@ const CreateRoom = () => {
       const token = localStorage.getItem("token");
 
       const res = await axios.post(
-        "https://collabaratory-platform.onrender.com/api/rooms/create",
+        "https://realtime-collab-coding.onrender.com//api/rooms/create",
         {},
         {
           headers: {
