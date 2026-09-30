@@ -10,7 +10,7 @@ const FileShare = ({ roomId }) => {
     const loadFiles = async () => {
       try {
         const res = await axios.get(
-          `https://collabaratory-platform-2.onrender.com//api/files/${roomId}`
+          `https://collabaratory-platform.onrender.com/api/files/${roomId}`
         );
 
         setFiles(res.data);
@@ -39,14 +39,14 @@ const FileShare = ({ roomId }) => {
 
     try {
       const res = await axios.post(
-        "https://collabaratory-platform-2.onrender.com//api/files/upload",
+        "https://collabaratory-platform.onrender.com/api/files/upload",
         formData
       );
 
       const token = localStorage.getItem("token");
 
 await axios.post(
-  "https://collabaratory-platform-2.onrender.com//api/rooms/save-activity",
+  "https://collabaratory-platform.onrender.com/api/rooms/save-activity",
   {
     roomId,
     text: `${localStorage.getItem("name")} uploaded ${file.name}`
@@ -77,13 +77,13 @@ const deleteFile = async (id, fileName) => {
   try {
 
     await axios.delete(
-      `https://collabaratory-platform-2.onrender.com//api/files/${id}`
+      `https://collabaratory-platform.onrender.com/api/files/${id}`
     );
 
     const token = localStorage.getItem("token");
 
     await axios.post(
-      "https://collabaratory-platform-2.onrender.com//api/rooms/save-activity",
+      "https://collabaratory-platform.onrender.com/api/rooms/save-activity",
       {
         roomId,
         text: `${localStorage.getItem("name")} deleted ${fileName}`
@@ -180,7 +180,7 @@ const clearSelectedFile = () => {
             }}
           >
             <a
-  href={`https://collabaratory-platform-2.onrender.com//uploads/${file.fileUrl}`}
+  href={`https://collabaratory-platform.onrender.com/uploads/${file.fileUrl}`}
   target="_blank"
   rel="noreferrer"
 >
@@ -190,7 +190,7 @@ const clearSelectedFile = () => {
 {" "}
 
 <a
-  href={`https://collabaratory-platform-2.onrender.com//uploads/${file.fileUrl}`}
+  href={`https://collabaratory-platform.onrender.com/uploads/${file.fileUrl}`}
   download
 >
   <button>
