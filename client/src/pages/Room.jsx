@@ -116,7 +116,7 @@ const RoomInner = ({ roomId }) => {
         const token = localStorage.getItem("token");
 
         const res = await axios.get(
-          `https://realtime-collab-coding.onrender.com//api/rooms/data/${roomId}`,
+          `https://realtime-collab-coding.onrender.com/api/rooms/data/${roomId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`
@@ -192,7 +192,7 @@ const RoomInner = ({ roomId }) => {
 
       // Save Message
       await axios.post(
-        "https://realtime-collab-coding.onrender.com//api/rooms/save-message",
+        "https://realtime-collab-coding.onrender.com/api/rooms/save-message",
         {
           roomId,
           username,
@@ -207,7 +207,7 @@ const RoomInner = ({ roomId }) => {
 
       // Save Activity
       await axios.post(
-        "https://realtime-collab-coding.onrender.com//api/rooms/save-activity",
+        "https://realtime-collab-coding.onrender.com/api/rooms/save-activity",
         {
           roomId,
           text: `${username} sent a message`

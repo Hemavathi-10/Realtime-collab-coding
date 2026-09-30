@@ -18,7 +18,7 @@ const handleLogin = async () => {
   setLoading(true);
   try {
     const res = await axios.post(
-      "https://realtime-collab-coding.onrender.com//api/auth/login",
+      "https://realtime-collab-coding.onrender.com/api/auth/login",
       {
         email,
         password

@@ -20,7 +20,7 @@ const Register = () => {
 
     try {
       const res = await axios.post(
-        "https://realtime-collab-coding.onrender.com//api/auth/register",
+        "https://realtime-collab-coding.onrender.com/api/auth/register",
         {
           name,
           email,
